@@ -116,8 +116,23 @@ const tourSchema = new mongoose.Schema(
   }
 );
 
+//IMPROVING READ PERFORMANCE WITH INDEXES
+// tourSchema.index({ price: 1 });
+tourSchema.index({ price: 1, ratingsAverage: -1 });
+tourSchema.index({ slug: 1 });
+
+//Create Virtual Field
 tourSchema.virtual('durationWeeks').get(function() {
   return this.duration / 7;
+});
+
+// Virtual Populate Tours and Reviews
+//Do not keep an array of child documents on parent document
+//Dont persist a data on dataBase
+tourSchema.virtual('reviews', {
+  ref: 'Review',
+  foreignField: 'tour', // is equal to `foreignField`
+  localField: '_id' // Find reviews where `localField`
 });
 
 // DOCUMENT MIDDLEWARE: runs before .save() and .create()
@@ -147,11 +162,12 @@ tourSchema.pre('save', function(next) {
 // tourSchema.pre('find', function(next) {
 tourSchema.pre(/^find/, function(next) {
   this.find({ secretTour: { $ne: true } });
+
   this.start = Date.now();
   next();
 });
 
-//Populating Tour Guides for Get All Tours
+//Populating Tour Guides
 tourSchema.pre(/^find/, function(next) {
   this.populate({
     path: 'guides',
@@ -161,18 +177,25 @@ tourSchema.pre(/^find/, function(next) {
   next();
 });
 
+//IF WE WANT TO GET REVIEWS OF ALL TOURS
+// tourSchema.pre(/^find/, function(next) {
+//   this.populate('reviews');
+
+//   next();
+// });
+
 tourSchema.post(/^find/, function(docs, next) {
   console.log(`Query took ${Date.now() - this.start} milliseconds!`);
   next();
 });
 
 //AGGREGATION MIDDLEWARE
-tourSchema.pre('aggregate', function(next) {
-  //The unshift() method adds one or more elements to the beginning of an array and returns the new length of the array.
-  this.pipeline().unshift({ $match: { secretTour: { $ne: true } } });
-  // console.log(this.pipeline());
-  next();
-});
+// tourSchema.pre('aggregate', function(next) {
+//   //The unshift() method adds one or more elements to the beginning of an array and returns the new length of the array.
+//   this.pipeline().unshift({ $match: { secretTour: { $ne: true } } });
+//   // console.log(this.pipeline());
+//   next();
+// });
 
 const Tour = mongoose.model('Tour', tourSchema);
 
