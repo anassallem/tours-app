@@ -1,6 +1,6 @@
 // review / rating / createdAt / ref to tour / ref to user
 const mongoose = require('mongoose');
-//const Tour = require('./tourModel');
+const Tour = require('./tourModel');
 
 const reviewSchema = new mongoose.Schema(
   {
@@ -34,7 +34,9 @@ const reviewSchema = new mongoose.Schema(
   }
 );
 
-// reviewSchema.index({ tour: 1, user: 1 }, { unique: true });
+//Preventing Duplicate Reviews
+reviewSchema.index({ tour: 1, user: 1 }, { unique: true });
+
 //Populating Reviews
 reviewSchema.pre(/^find/, function(next) {
   // this.populate({
@@ -52,51 +54,59 @@ reviewSchema.pre(/^find/, function(next) {
   next();
 });
 
-// reviewSchema.statics.calcAverageRatings = async function(tourId) {
-//   const stats = await this.aggregate([
-//     {
-//       $match: { tour: tourId }
-//     },
-//     {
-//       $group: {
-//         _id: '$tour',
-//         nRating: { $sum: 1 },
-//         avgRating: { $avg: '$rating' }
-//       }
-//     }
-//   ]);
-//   // console.log(stats);
+//statics are the methods defined on the Model. methods are defined on the document (instance).
+//Statics are pretty much the same as methods but allow for defining functions that exist directly on your Model.
+reviewSchema.statics.calcAverageRatings = async function(tourId) {
+  //(this) points to the model
+  const stats = await this.aggregate([
+    {
+      $match: { tour: tourId }
+    },
+    {
+      $group: {
+        _id: '$tour',
+        nRating: { $sum: 1 },
+        avgRating: { $avg: '$rating' }
+      }
+    }
+  ]);
+  //console.log(stats);
+  // Persist stats in this tour document
+  if (stats.length > 0) {
+    await Tour.findByIdAndUpdate(tourId, {
+      ratingsQuantity: stats[0].nRating,
+      ratingsAverage: stats[0].avgRating
+    });
+  } else {
+    await Tour.findByIdAndUpdate(tourId, {
+      ratingsQuantity: 0,
+      ratingsAverage: 4.5
+    });
+  }
+};
 
-//   if (stats.length > 0) {
-//     await Tour.findByIdAndUpdate(tourId, {
-//       ratingsQuantity: stats[0].nRating,
-//       ratingsAverage: stats[0].avgRating
-//     });
-//   } else {
-//     await Tour.findByIdAndUpdate(tourId, {
-//       ratingsQuantity: 0,
-//       ratingsAverage: 4.5
-//     });
-//   }
-// };
+// call this middleware each time that a new review is created
+//We should not use pre because the current review is not really in the collection just Yet
+reviewSchema.post('save', function() {
+  // this points to current review
+  //Review.calcAverageRatings(this.tour); But Review is not defined so we use this:constructor
+  this.constructor.calcAverageRatings(this.tour);
+  // next(); the post middleware does not get access to next
+});
 
-// reviewSchema.post('save', function() {
-//   // this points to current review
-//   this.constructor.calcAverageRatings(this.tour);
-// });
-
+// QUERY MIDDLEWARE
 // // findByIdAndUpdate
 // // findByIdAndDelete
-// reviewSchema.pre(/^findOneAnd/, async function(next) {
-//   this.r = await this.findOne();
-//   // console.log(this.r);
-//   next();
-// });
+reviewSchema.pre(/^findOneAnd/, async function(next) {
+  this.r = await this.findOne(); // we use this.r to passing the data from the pre middleware to the post middleware
+  // console.log(this.r);
+  next();
+});
 
-// reviewSchema.post(/^findOneAnd/, async function() {
-//   // await this.findOne(); does NOT work here, query has already executed
-//   await this.r.constructor.calcAverageRatings(this.r.tour);
-// });
+reviewSchema.post(/^findOneAnd/, async function() {
+  // await this.findOne(); does NOT work here, query has already executed
+  await this.r.constructor.calcAverageRatings(this.r.tour);
+});
 
 const Review = mongoose.model('Review', reviewSchema);
 

@@ -75,6 +75,7 @@ userSchema.pre(/^find/, function(next) {
 });
 
 //Instance methode is can be available on all documents of collection
+//https://mongoosejs.com/docs/2.7.x/docs/methods-statics.html
 userSchema.methods.correctPassword = async function(
   candidatePassword,
   userPassword
