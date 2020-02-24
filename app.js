@@ -1,3 +1,4 @@
+const path = require('path');
 const express = require('express');
 const morgan = require('morgan'); //HTTP request logger middleware for node.js
 const rateLimit = require('express-rate-limit'); //Basic rate-limiting middleware for Express. Use to limit repeated requests to public APIs and/or endpoints such as password reset.
@@ -5,6 +6,7 @@ const helmet = require('helmet'); //Helmet helps you secure your Express apps by
 const mongoSanitize = require('express-mongo-sanitize'); //middleware which sanitizes user-supplied data to prevent MongoDB Operator Injection.
 const xss = require('xss-clean'); //Node.js Connect middleware to sanitize user input coming from POST body, GET queries, and url params. Works with Express, Restify, or any other Connect app.
 const hpp = require('hpp'); // middleware to protect against HTTP Parameter Pollution attacks
+const cookieParser = require('cookie-parser');
 
 const AppError = require('./utils/appError');
 const globalErrorHandler = require('./controllers/errorController');
@@ -16,7 +18,14 @@ const reviewRouter = require('./routes/reviewRoutes');
 const app = express();
 // 1) GLOBAL MIDDLEWARES
 
+// Serving static files
+//app.use(express.static(`${__dirname}/public`));
+//__dirname is the directory of the currently executing module (which is not necessarily the working directory).
+//path.join will concatenate __dirname which is the directory name of the current file concatenated with values of some and dir with platform specific separator.
+app.use(express.static(path.join(__dirname, 'public')));
+
 // Set security HTTP headers
+//Helmet helps you secure your Express apps by setting various HTTP headers.
 app.use(helmet());
 
 // Development logging
@@ -33,7 +42,10 @@ const limiter = rateLimit({
 app.use('/api', limiter);
 
 // Body parser, reading data from body into req.body
-app.use(express.json({ limit: '10kb' })); //Returns middleware that only parses json.
+app.use(express.json({ limit: '10kb' })); //Returns middleware that only parses json.Parser Data Fron The Body
+app.use(express.urlencoded({ extended: true, limit: '10kb' })); //Returns middleware that only parses urlencoded with the qs module.// Parse Data incoming from a Form
+app.use(cookieParser()); //Parser Data from a cookies
+
 // DATA SANITIZATION
 // Data sanitization against NoSQL query injection
 app.use(mongoSanitize());
@@ -57,10 +69,7 @@ app.use(
   })
 );
 
-// Serving static files
-app.use(express.static(`${__dirname}/public`));
-
-// Test middleware
+// TEST MIDDLEWARE
 // app.use((req, res, next) => {
 //   console.log('Hello from the middleware 👋');
 //   next();
@@ -68,6 +77,7 @@ app.use(express.static(`${__dirname}/public`));
 app.use((req, res, next) => {
   req.requestTime = new Date().toISOString();
   // console.log(req.headers);
+  //console.log(req.cookies);
   next();
 });
 
