@@ -1,10 +1,51 @@
 const Review = require('./../models/reviewModel');
+const Booking = require('./../models/bookingModel');
+const Tour = require('./../models/tourModel');
 const factory = require('./handlerFactory');
-
+const AppError = require('./../utils/appError');
 exports.setTourUserIds = (req, res, next) => {
   // Allow nested routes
   if (!req.body.tour) req.body.tour = req.params.tourId;
   if (!req.body.user) req.body.user = req.user.id;
+  next();
+};
+
+exports.restrictToReviewTour = async (req, res, next) => {
+  console.log('req', req.body.user);
+
+  //Find All Bookings
+  // const bookings = await Booking.find({ user: req.body.user });
+  //OR
+  const booking = await Booking.findOne({
+    user: req.body.user,
+    tour: req.body.tour,
+    paid: true
+  });
+  console.log(booking);
+
+  if (!booking) {
+    return next(
+      new AppError(
+        'users can only review a tour that they have actually booked',
+        403
+      )
+    );
+  }
+  // console.log('bookings', bookings);
+
+  // 2) Find tours with the returned IDs
+  // const tourIDs = bookings.map(el => el.tour);
+  //const tours = await Tour.find({ _id: { $in: tourIDs } });
+  // console.log('tourIDs', tourIDs);
+  // if (!tourIDs.includes(req.body.tour)) {
+  //   return next(
+  //     new AppError(
+  //       'users can only review a tour that they have actually booked',
+  //       403
+  //     )
+  //   );
+  // }
+
   next();
 };
 
